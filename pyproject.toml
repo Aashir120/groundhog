@@ -1,0 +1,10 @@
+[project]
+name = "groundhog"
+version = "0.1.0"
+description = "Data Science Automation Meta-Harness"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=3.0.5",
+    "reflex>=0.9.8.post1",
+]
