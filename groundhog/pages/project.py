@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import reflex as rx
 
+from ..components.analysis_view import analysis_view
 from ..components.configure_view import configure_view
 from ..components.header import header
 from ..components.summary_view import summary_view
@@ -18,6 +19,7 @@ def project() -> rx.Component:
             ProjectState.stage,
             ("upload", upload_view()),
             ("configure", configure_view()),
+            ("analysis", analysis_view()),
             ("summary", summary_view()),
             ("not_found", rx.center(
                 rx.text("Project not found.", color="gray"),

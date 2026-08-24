@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from ..states.project_detail import ExperimentRow, ProjectState
+from .run_log import run_log
 
 
 def _metadata_row(label: str, value: rx.Var | str) -> rx.Component:
@@ -64,21 +65,25 @@ def _experiments_table() -> rx.Component:
     )
 
 
-def _log_panel() -> rx.Component:
-    return rx.cond(
-        ProjectState.log_lines.length() > 0,
-        rx.box(
-            rx.foreach(ProjectState.log_lines, lambda line: rx.text(line, size="1")),
-            font_family="monospace",
-            background="var(--gray-2)",
-            border="1px solid var(--gray-5)",
-            border_radius="0.5em",
-            padding="1em",
-            margin_top="1em",
-            max_height="320px",
-            overflow_y="auto",
-            width="100%",
+def _analysis_section() -> rx.Component:
+    """ANALYSIS.md, collapsed by default so it doesn't bury the results table."""
+    return rx.box(
+        rx.heading("Data analysis", size="4", margin_top="1.5em"),
+        rx.cond(
+            ProjectState.analysis_text != "",
+            rx.accordion.root(
+                rx.accordion.item(
+                    header="ANALYSIS.md",
+                    content=rx.markdown(ProjectState.analysis_text),
+                ),
+                collapsible=True,
+                variant="soft",
+                width="100%",
+                margin_top="0.5em",
+            ),
+            rx.text("No analysis yet.", color="gray"),
         ),
+        width="100%",
     )
 
 
@@ -91,6 +96,7 @@ def summary_view() -> rx.Component:
             color="gray",
         ),
         _metadata_table(),
+        _analysis_section(),
         rx.heading("Experiments", size="4", margin_top="1.5em"),
         _experiments_table(),
         rx.hstack(
@@ -102,11 +108,7 @@ def summary_view() -> rx.Component:
             ),
             margin_top="1.5em",
         ),
-        rx.cond(
-            ProjectState.run_error != "",
-            rx.text(ProjectState.run_error, color="red", size="2", margin_top="0.5em"),
-        ),
-        _log_panel(),
+        run_log(),
         width="100%",
         max_width="840px",
         margin="0 auto",

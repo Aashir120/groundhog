@@ -23,7 +23,7 @@ class ExperimentRow(pydantic.BaseModel):
 
 
 class ProjectState(rx.State):
-    # "loading" | "not_found" | "upload" | "configure" | "summary"
+    # "loading" | "not_found" | "upload" | "configure" | "analysis" | "summary"
     stage: str = "loading"
     error: str = ""
 
@@ -37,6 +37,9 @@ class ProjectState(rx.State):
     split_mode: str = "percentage"
     split_value: str = "0.8"
     eval_metric: str = "AUC"
+
+    # populated once ANALYSIS.md exists
+    analysis_text: str = ""
 
     # populated once metadata.json exists (summary stage)
     target_dtype: str = ""
@@ -57,27 +60,25 @@ class ProjectState(rx.State):
     def load_project(self):
         name = self.name
         self.error = ""
-        if not fs.project_exists(name):
-            self.stage = "not_found"
+        # Stage is decided from what's on disk, so the agent writing ANALYSIS.md
+        # is enough to advance the project.
+        self.stage = fs.project_stage(name)
+        if self.stage == "not_found":
             return
 
         self.dataset_files = fs.list_data_files(name)
-        if not self.dataset_files:
-            self.stage = "upload"
+        if self.stage == "upload":
             return
 
-        meta = fs.read_metadata(name)
-        if meta is None:
+        if self.stage == "configure":
             preview = fs.dataset_preview(name)
             self.record_count = preview["record_count"]
             self.columns = [ColumnInfo(**c) for c in preview["columns"]]
             if not self.target_variable and self.columns:
                 self.target_variable = self.columns[0].name
-            self.stage = "configure"
             return
 
-        self._load_summary(name, meta)
-        self.stage = "summary"
+        self._load_summary(name, fs.read_metadata(name) or {})
 
     def _load_summary(self, name: str, meta: dict):
         self.record_count = meta.get("record_count", 0)
@@ -90,6 +91,7 @@ class ProjectState(rx.State):
         self.split_mode = split.get("mode", "percentage")
         self.split_value = str(split.get("value", ""))
         self.eval_metric = meta.get("eval_metric", "")
+        self.analysis_text = fs.read_analysis(name)
         rows = fs.parse_results(name)
         self.experiments = [ExperimentRow(**r) for r in rows]
         self.top_result = fs.top_result(name, self.eval_metric, rows)
@@ -144,7 +146,15 @@ class ProjectState(rx.State):
         self.load_project()
 
     @rx.event(background=True)
+    async def run_analysis(self):
+        await self._run(agent.run_analysis)
+
+    @rx.event(background=True)
     async def run_experiment(self):
+        await self._run(agent.run_experiment)
+
+    async def _run(self, runner):
+        """Stream one agent run into the log panel, then reload the page state."""
         async with self:
             if self.is_running:
                 return
@@ -155,7 +165,7 @@ class ProjectState(rx.State):
 
         settings = fs.read_settings()
         try:
-            async for line in agent.run_experiment(name, settings):
+            async for line in runner(name, settings):
                 async with self:
                     self.log_lines.append(line)
         except (agent.AgentRunError, agent.AgentConfigError) as exc:
@@ -167,7 +177,9 @@ class ProjectState(rx.State):
         finally:
             async with self:
                 self.is_running = False
-                self._load_summary(name, fs.read_metadata(name) or {})
+                # Reload rather than just refreshing the summary: an analysis
+                # run moves the project from the analysis stage to summary.
+                self.load_project()
 
     @staticmethod
     def _missing_cli_message(settings: dict) -> str:

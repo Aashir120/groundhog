@@ -16,9 +16,12 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 PROJECTS_DIR = ROOT / "projects"
-AGENTS_MD = ROOT / "AGENTS.md"
 SETTINGS_FILE = ROOT / "settings.json"
-REFLEX_MANAGED_END_MARKER = "<!-- reflex managed end -->"
+PROMPTS_DIR = ROOT / "prompts"
+
+# Prompt files carry a human-facing header, then "---", then the text sent
+# to the agent.
+PROMPT_HEADER_SEPARATOR = "\n---\n"
 
 RESULTS_HEADER = (
     "# Results\n\n"
@@ -50,6 +53,10 @@ def experiments_dir(name: str) -> Path:
 
 def results_path(name: str) -> Path:
     return project_dir(name) / "RESULTS.md"
+
+
+def analysis_path(name: str) -> Path:
+    return project_dir(name) / "ANALYSIS.md"
 
 
 def metadata_path(name: str) -> Path:
@@ -171,18 +178,43 @@ def list_experiments(name: str) -> list[str]:
     return sorted(p.name for p in d.iterdir() if p.is_dir())
 
 
-def experiment_agent_instructions() -> str:
-    """Return the app-specific portion of AGENTS.md (after the Reflex-managed block)."""
-    if not AGENTS_MD.is_file():
+def project_stage(name: str) -> str:
+    """Which step of the setup flow a project is at, decided from disk alone."""
+    if not project_exists(name):
+        return "not_found"
+    if not list_data_files(name):
+        return "upload"
+    if read_metadata(name) is None:
+        return "configure"
+    if not has_analysis(name):
+        return "analysis"
+    return "summary"
+
+
+def has_analysis(name: str) -> bool:
+    """Whether the analysis run has produced an ANALYSIS.md for this project."""
+    path = analysis_path(name)
+    return path.is_file() and bool(path.read_text().strip())
+
+
+def read_analysis(name: str) -> str:
+    path = analysis_path(name)
+    return path.read_text() if path.is_file() else ""
+
+
+def read_prompt(kind: str) -> str:
+    """Return the agent-facing body of ``prompts/<kind>.md``.
+
+    Everything before the first ``---`` line is a header for humans reading the
+    file and is stripped out. Returns an empty string if the file is missing so
+    the caller can refuse to launch an agent with no instructions.
+    """
+    path = PROMPTS_DIR / f"{kind}.md"
+    if not path.is_file():
         return ""
-    text = AGENTS_MD.read_text()
-    idx = text.find(REFLEX_MANAGED_END_MARKER)
-    if idx == -1:
-        # Falling back to the whole file would hand the agent the
-        # Reflex-managed developer docs as its prompt, which is worse than
-        # refusing to run.
-        return ""
-    return text[idx + len(REFLEX_MANAGED_END_MARKER):].strip()
+    text = path.read_text()
+    _, separator, body = text.partition(PROMPT_HEADER_SEPARATOR)
+    return (body if separator else text).strip()
 
 
 def _write_json(path: Path, payload: dict) -> None:
