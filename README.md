@@ -1,11 +1,20 @@
 # 🦦 Groundhog
 
-Data science meta-harness application for agentic experimentation looping.
+Data science meta-harness application for agentic experimentation loops.
 
-Load a dataset, define your target variable and train/test strategy.
-Then launch your AI coding agent to run indepdent loops of experimentation.
-Each loop reflects on previous experiments and results before devising the
-next approach.
+**The problem**: Solving data science problems often requires many iterations
+ of experimentation. Each loop learning from the results of previous iterations.
+ These problems are not solved by simply describing a problem and designing
+ an appropriate solution.
+
+This project implements a meta-harness for using AI coding agents to perform
+those experiments. You define the problem through a dataset, required metric
+to optimise and an appropriate testing strategy. Then the groundhog meta-harness
+allows you to point one (or more) coding agents at the problem. Each new iteration
+can access the previous experimental notes and results to devise an improved approach.
+
+
+
 
 ## Implementation
 
@@ -29,5 +38,15 @@ launches it headlessly using that login for every experiment run.
    uv run reflex run
    ```
 3. Open http://localhost:3000 in your browser.
+
+* Create a project
+* Load a dataset
+* Specify your target variable
+* Choose a train/test strategy.
+* Then start you experiment
+ 
+The AI coding agent runs independent loops of experimentation.
+Each loop reflects on previous experiments and results before devising the
+next approach.
 
 
