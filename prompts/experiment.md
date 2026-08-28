@@ -13,7 +13,8 @@ order:
    strategy, evaluation metric). Read `ANALYSIS.md` — the initial analysis of
    this dataset — and treat its findings on distributions, missing values,
    class balance and leakage risk as established context you do not need to
-   rediscover. Read `RESULTS.md` for every result achieved so far. Read every
+   rediscover. Older projects may not have one; if it is absent, carry on and
+   work from the previous experiments instead. Read `RESULTS.md` for every result achieved so far. Read every
    `experiments/*/README.md` to see what approaches have already been tried
    and what was learned from each.
 

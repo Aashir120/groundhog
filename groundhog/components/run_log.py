@@ -21,6 +21,17 @@ def run_log() -> rx.Component:
             ),
         ),
         rx.cond(
+            ProjectState.run_warning != "",
+            rx.callout(
+                ProjectState.run_warning,
+                icon="triangle_alert",
+                color_scheme="amber",
+                size="1",
+                margin_top="1em",
+                width="100%",
+            ),
+        ),
+        rx.cond(
             ProjectState.log_lines.length() > 0,
             rx.box(
                 rx.foreach(

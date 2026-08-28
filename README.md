@@ -57,7 +57,13 @@ in the repo root, which is gitignored because it can hold API keys.
 The analysis step runs once per project. The agent explores the dataset —
 variable distributions, missing values, the nature of the target variable and
 univariate relationships — and writes what it finds to `ANALYSIS.md`.
-Experiments stay locked until it has done so.
+Experiments stay locked until a project has one.
+
+If you have already done that work, you can skip the agent run and write the
+analysis yourself in the text box on the same screen. Either way it ends up in
+`ANALYSIS.md`, which is what the experiments read. Projects created before this
+step existed keep working — they show their experiments as before and are not
+locked.
 
 After that the AI coding agent runs independent loops of experimentation. Each
 loop reads `ANALYSIS.md` plus the previous experiments and results before

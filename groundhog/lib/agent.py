@@ -82,13 +82,15 @@ async def run_experiment(
 ) -> AsyncIterator[str]:
     """Run one experiment loop.
 
-    Refuses to start until the analysis run has produced an ANALYSIS.md, since
-    the experiment prompt treats that file as established context.
+    A project that has not been analysed yet has to be analysed first, since the
+    experiment prompt treats ANALYSIS.md as established context. Projects that
+    already have experiments predate the analysis stage and are not blocked —
+    they would otherwise be unable to continue work they had already started.
     """
-    if not fs.has_analysis(project_name):
+    if not fs.has_analysis(project_name) and not fs.has_experiments(project_name):
         raise AgentConfigError(
-            "Run the analysis first — the experiment prompt depends on "
-            "ANALYSIS.md."
+            "Run the analysis first, or write one yourself — the experiment "
+            "prompt uses ANALYSIS.md as its reference."
         )
     async for line in _run(project_name, "experiment", settings):
         yield line

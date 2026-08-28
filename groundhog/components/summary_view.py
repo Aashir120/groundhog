@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from ..states.project_detail import ExperimentRow, ProjectState
+from .analysis_panel import analysis_panel
 from .run_log import run_log
 
 
@@ -66,11 +67,11 @@ def _experiments_table() -> rx.Component:
 
 
 def _analysis_section() -> rx.Component:
-    """ANALYSIS.md, collapsed by default so it doesn't bury the results table."""
+    """The analysis document once it exists, or the prompt to produce one."""
     return rx.box(
         rx.heading("Data analysis", size="4", margin_top="1.5em"),
         rx.cond(
-            ProjectState.analysis_text != "",
+            ProjectState.has_analysis,
             rx.accordion.root(
                 rx.accordion.item(
                     header="ANALYSIS.md",
@@ -81,7 +82,7 @@ def _analysis_section() -> rx.Component:
                 width="100%",
                 margin_top="0.5em",
             ),
-            rx.text("No analysis yet.", color="gray"),
+            analysis_panel(),
         ),
         width="100%",
     )
@@ -99,14 +100,21 @@ def summary_view() -> rx.Component:
         _analysis_section(),
         rx.heading("Experiments", size="4", margin_top="1.5em"),
         _experiments_table(),
-        rx.hstack(
-            rx.button(
-                rx.cond(ProjectState.experiments.length() == 0, "Start Experiment", "Run Next Experiment"),
-                on_click=ProjectState.run_experiment,
-                loading=ProjectState.is_running,
-                disabled=ProjectState.is_running,
+        rx.cond(
+            ProjectState.can_run_experiments,
+            rx.hstack(
+                rx.button(
+                    rx.cond(
+                        ProjectState.experiments.length() == 0,
+                        "Start Experiment",
+                        "Run Next Experiment",
+                    ),
+                    on_click=ProjectState.run_experiment,
+                    loading=ProjectState.is_running,
+                    disabled=ProjectState.is_running,
+                ),
+                margin_top="1.5em",
             ),
-            margin_top="1.5em",
         ),
         run_log(),
         width="100%",

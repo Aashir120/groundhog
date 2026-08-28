@@ -40,6 +40,9 @@ class ProjectState(rx.State):
 
     # populated once ANALYSIS.md exists
     analysis_text: str = ""
+    # free-text analysis the user writes instead of running the agent
+    analysis_draft: str = ""
+    analysis_error: str = ""
 
     # populated once metadata.json exists (summary stage)
     target_dtype: str = ""
@@ -51,10 +54,23 @@ class ProjectState(rx.State):
     is_running: bool = False
     log_lines: list[str] = []
     run_error: str = ""
+    # set when a run exits cleanly but produces nothing, which otherwise looks
+    # identical to never having pressed the button
+    run_warning: str = ""
 
     @rx.var
     def column_names(self) -> list[str]:
         return [c.name for c in self.columns]
+
+    @rx.var
+    def has_analysis(self) -> bool:
+        return self.analysis_text.strip() != ""
+
+    @rx.var
+    def can_run_experiments(self) -> bool:
+        """Experiments need an analysis, unless the project already has some —
+        those predate the analysis stage and must not be locked out."""
+        return self.has_analysis or len(self.experiments) > 0
 
     @rx.event
     def load_project(self):
@@ -145,15 +161,31 @@ class ProjectState(rx.State):
         self.error = ""
         self.load_project()
 
+    @rx.event
+    def set_analysis_draft(self, value: str):
+        self.analysis_draft = value
+
+    @rx.event
+    def save_analysis(self):
+        """Write a user-supplied analysis, skipping the agent run."""
+        try:
+            fs.write_analysis(self.name, self.analysis_draft)
+        except ValueError as exc:
+            self.analysis_error = str(exc)
+            return
+        self.analysis_draft = ""
+        self.analysis_error = ""
+        self.load_project()
+
     @rx.event(background=True)
     async def run_analysis(self):
-        await self._run(agent.run_analysis)
+        await self._run(agent.run_analysis, "analysis")
 
     @rx.event(background=True)
     async def run_experiment(self):
-        await self._run(agent.run_experiment)
+        await self._run(agent.run_experiment, "experiment")
 
-    async def _run(self, runner):
+    async def _run(self, runner, kind: str):
         """Stream one agent run into the log panel, then reload the page state."""
         async with self:
             if self.is_running:
@@ -161,7 +193,10 @@ class ProjectState(rx.State):
             self.is_running = True
             self.log_lines = []
             self.run_error = ""
+            self.run_warning = ""
             name = self.name
+
+        results_before = len(fs.parse_results(name))
 
         settings = fs.read_settings()
         try:
@@ -180,6 +215,27 @@ class ProjectState(rx.State):
                 # Reload rather than just refreshing the summary: an analysis
                 # run moves the project from the analysis stage to summary.
                 self.load_project()
+                if not self.run_error:
+                    self.run_warning = self._nothing_produced(
+                        name, kind, results_before
+                    )
+
+    @staticmethod
+    def _nothing_produced(name: str, kind: str, results_before: int) -> str:
+        """An agent can exit cleanly having written no result — usually because
+        its own script failed. Say so rather than showing an empty table."""
+        if kind == "analysis" and not fs.has_analysis(name):
+            return (
+                "The agent finished without writing ANALYSIS.md. Check the "
+                "output below."
+            )
+        if kind == "experiment" and len(fs.parse_results(name)) == results_before:
+            return (
+                "The agent finished without recording a result in RESULTS.md. "
+                "Its experiment code most likely failed — check the output "
+                "below and the experiments directory."
+            )
+        return ""
 
     @staticmethod
     def _missing_cli_message(settings: dict) -> str:
